@@ -1,39 +1,33 @@
 #!/usr/bin/env python3
+############################################################
+# Program is part of MintPy                                #
+# Copyright (c) 2013, Zhang Yunjun, Heresh Fattahi         #
+# Author: Rowan Biessel, June 2021                         #
+############################################################
 
 import os
 import glob
-import json  # for loads
+import json
 import shutil
-from numpy.core.fromnumeric import compress
 from osgeo import gdal
 from pyproj import Transformer
-import matplotlib.pyplot as plt
 import argparse
 import sys
 from typing import Tuple
 
 
 def create_parser(iargs=None):
-    parser = argparse.ArgumentParser(description='Subset a stack of HyP3 Interferograms. Run this before prep_hyp3.py',
+    parser = argparse.ArgumentParser(description='Subset a stack of HyP3 Interferograms and generate a template MintPy directory structure. On completion, run: smallBaselineApp.py template.txt',
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('path', help='Path to interferograms')
     parser.add_argument('-l', '--lat', dest='subset_lat',
-                        type=float, nargs=2, help='subset range in latitude', required=True)
+                        type=float, nargs=2, help='subset range in latitude, S N', required=True)
     parser.add_argument('-L', '--lon', dest='subset_lon',
-                        type=float, nargs=2, help='subset range in column\n\n', required=True)
+                        type=float, nargs=2, help='subset range in longitude: W E', required=True)
     parser.add_argument(
         '-o', '--output', dest='output', help='Path to build directory structure', required=True)
     params = parser.parse_args(args=iargs)
     return params
-
-
-def get_tiff_paths(paths):
-    """
-        Get a list of paths to the desired geotiffs
-    """
-    tiff_paths = glob.glob(paths)
-    tiff_paths.sort()
-    return tiff_paths
 
 
 def build_template(mintpy_path):
@@ -64,7 +58,7 @@ mintpy.load.incAngleFile     = {os.path.join(directory, '*/*inc_map.tif')}
 
 def get_utm_zone(path: str) -> str:
     """
-        Extract the UTM zone from a geotiff given by the path
+        Extract the UTM zone from a geotiff given by the path.
     """
 
     info = gdal.Info(path, options=['-json'])
@@ -86,7 +80,7 @@ def lonLat_to_utm(lon: float, lat: float, utm: str) -> Tuple[float, float]:
 
 def move_and_clip(path: str, destination: str, utm: str, ul_utm, lr_utm):
     """
-        Given a hyp3 geotiff or metadata txt file, clip it by a bounding box into the correct bounding box, 
+        Given a hyp3 geotiff or metadata txt file, clip it by a bounding box into the correct bounding box,
         or simply move the file if it is just a text file.
     """
     if '.txt' in path:
@@ -95,6 +89,19 @@ def move_and_clip(path: str, destination: str, utm: str, ul_utm, lr_utm):
         options = gdal.TranslateOptions(
             projWin=[ul_utm[0], ul_utm[1], lr_utm[0], lr_utm[1]], projWinSRS=f'EPSG:{utm}', noData=0)
         gdal.Translate(destination, path, options=options)
+
+
+def get_paths(paths: list):
+    """
+        Get a list of paths to the desired geotiffs from a list of glob patterns.
+    """
+
+    tiff_paths = []
+    for path in paths:
+        tiff_paths += glob.glob(path)
+
+    tiff_paths.sort()
+    return tiff_paths
 
 
 def main(iargs=None):
@@ -110,10 +117,10 @@ def main(iargs=None):
     paths_inc = f"{tiff_dir}/**/*_inc_map.tif"
     paths_meta = f"{tiff_dir}/**/*[!.md].txt"
 
-    if os.path.exists(tiff_dir):
-        tiff_paths = get_tiff_paths(
-            paths_cor) + get_tiff_paths(paths_unw) + get_tiff_paths(paths_meta) + get_tiff_paths(paths_dem) + get_tiff_paths(paths_inc)
+    paths = [paths_cor, paths_unw, paths_dem, paths_inc, paths_meta]
 
+    if os.path.exists(tiff_dir):
+        tiff_paths = get_paths(paths)
         print(f'Found {len(tiff_paths)} files')
         if len(tiff_paths) < 1:
             print(f"{tiff_dir} exists but contains no tifs.")
@@ -134,6 +141,7 @@ def main(iargs=None):
         os.path.dirname(path)) for path in tiff_paths])
 
     hyp3_path = os.path.join(cwd, parameters.output, 'hyp3')
+
     if not os.path.exists(hyp3_path):
         os.mkdir(hyp3_path)
 
