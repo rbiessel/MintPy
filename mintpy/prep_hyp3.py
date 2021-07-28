@@ -73,7 +73,7 @@ DESCRIPTION = """
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='Prepare attributes file for HyP3 InSAR product.\n'+
+    parser = argparse.ArgumentParser(description='Prepare attributes file for HyP3 InSAR product.\n' +
                                      DESCRIPTION,
                                      formatter_class=argparse.RawTextHelpFormatter,
                                      epilog=EXAMPLE)
@@ -90,7 +90,7 @@ def cmd_line_parse(iargs=None):
 
 
 #########################################################################
-def add_hyp3_metadata(fname,meta,is_ifg=True):
+def add_hyp3_metadata(fname, meta, is_ifg=True):
     '''Read/extract attribute data from HyP3 metadata file and add to metadata dictionary
     Inputs:
         *unw_phase.tif, *corr.tif file name, *dem.tif, *inc_map.tif, e.g.
@@ -103,8 +103,10 @@ def add_hyp3_metadata(fname,meta,is_ifg=True):
     '''
 
     # determine interferogram pair info and hyp3 metadata file name
-    sat, date1_string, date2_string, pol, res, soft, proc, ids, *_ = os.path.basename(fname).split('_')
-    job_id = '_'.join([sat, date1_string, date2_string, pol, res, soft, proc, ids])
+    sat, date1_string, date2_string, pol, res, soft, proc, ids, * \
+        _ = os.path.basename(fname).split('_')
+    job_id = '_'.join([sat, date1_string, date2_string,
+                       pol, res, soft, proc, ids])
     directory = os.path.dirname(fname)
     meta_file = f'{os.path.join(directory,job_id)}.txt'
 
@@ -120,13 +122,22 @@ def add_hyp3_metadata(fname,meta,is_ifg=True):
     meta['HEADING'] = hyp3_meta['Heading']
     meta['ALOOKS'] = hyp3_meta['Azimuth looks']
     meta['RLOOKS'] = hyp3_meta['Range looks']
+    # meta['STARTING_RANGE'] = hyp3_meta['Slant range near']
     meta['P_BASELINE_TOP_HDR'] = hyp3_meta['Baseline']
     meta['P_BASELINE_BOTTOM_HDR'] = hyp3_meta['Baseline']
-    meta['EARTH_RADIUS'] = hyp3_meta['Earth radius at nadir']
-    meta['HEIGHT'] = hyp3_meta['Spacecraft height']
+    try:
+        meta['EARTH_RADIUS'] = hyp3_meta['Earth radius at nadir']
+    except:
+        meta['EARTH_RADIUS'] = 6364725.0742
+
+    try:
+        meta['HEIGHT'] = hyp3_meta['Spacecraft height']
+    except:
+        meta['HEIGHT'] = 703446.9369999999
 
     # add LAT/LON_REF1/2/3/4 based on whether satellite ascending or descending
-    meta['ORBIT_DIRECTION'] = 'ASCENDING' if float(meta['HEADING']) > -90 else 'DESCENDING'
+    meta['ORBIT_DIRECTION'] = 'ASCENDING' if float(
+        meta['HEADING']) > -90 else 'DESCENDING'
     N = float(meta['Y_FIRST'])
     W = float(meta['X_FIRST'])
     S = N + float(meta['Y_STEP']) * int(meta['LENGTH'])
@@ -164,10 +175,11 @@ def add_hyp3_metadata(fname,meta,is_ifg=True):
 
     # add metadata that is only relevant to interferogram files
     if is_ifg:
-        date1 = datetime.strptime(date1_string,'%Y%m%dT%H%M%S')
-        date2 = datetime.strptime(date2_string,'%Y%m%dT%H%M%S')
+        date1 = datetime.strptime(date1_string, '%Y%m%dT%H%M%S')
+        date2 = datetime.strptime(date2_string, '%Y%m%dT%H%M%S')
         date_avg = date1 + (date2 - date1) / 2
-        date_avg_seconds = (date_avg - date_avg.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
+        date_avg_seconds = (date_avg - date_avg.replace(hour=0,
+                                                        minute=0, second=0, microsecond=0)).total_seconds()
 
         meta['CENTER_LINE_UTC'] = date_avg_seconds
         meta['DATE12'] = f'{date1.strftime("%y%m%d")}-{date2.strftime("%y%m%d")}'
@@ -182,7 +194,7 @@ def main(iargs=None):
 
     # for each filename, generate metadata rsc file
     for fname in inps.file:
-        is_ifg = any([x in fname for x in ['unw_phase','corr']])
+        is_ifg = any([x in fname for x in ['unw_phase', 'corr']])
         meta = readfile.read_gdal_vrt(fname)
         meta = add_hyp3_metadata(fname, meta, is_ifg=is_ifg)
 
